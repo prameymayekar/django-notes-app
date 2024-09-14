@@ -1,44 +1,40 @@
 pipeline {
-    
-    agent { 
-        node{
-            label "dev"
-            
+    agent any
+
+    stages {
+        stage('Code') {
+            steps {
+                echo 'Cloning the code'
+                git url:"https://github.com/prameymayekar/django-notes-app.git", branch: "main"
+            }
+        }
+         stage('Build') {
+            steps {
+                echo 'Building an image'
+                sh "docker build -t my-note-app ."
+            }
+        }
+         stage('Push to docker') {
+    steps {
+        echo 'Pushing image to DockerHub'
+        withCredentials([usernamePassword(credentialsId: "docker-cred", passwordVariable: "dockerHubpass", usernameVariable: "dockerHubUser")]) {
+            script {
+                // Tag the image with DockerHub repo and latest tag
+                sh "docker tag my-note-app ${dockerHubUser}/my-note-app:latest"
+                
+                // Log in to DockerHub using the credentials
+                sh "echo ${dockerHubpass} | docker login -u ${dockerHubUser} --password-stdin"
+                
+                // Push the image to DockerHub
+                sh "docker push ${dockerHubUser}/my-note-app:latest"
+            }
         }
     }
-    
-    stages{
-        stage("Clone Code"){
-            steps{
-                git url: "https://github.com/LondheShubham153/django-notes-app.git", branch: "main"
-                echo "Aaj toh LinkedIn Post bannta hai boss"
-            }
-        }
-        stage("Build & Test"){
-            steps{
-                sh "docker build . -t notes-app-jenkins:latest"
-            }
-        }
-        stage("Push to DockerHub"){
-            steps{
-                withCredentials(
-                    [usernamePassword(
-                        credentialsId:"dockerCreds",
-                        passwordVariable:"dockerHubPass", 
-                        usernameVariable:"dockerHubUser"
-                        )
-                    ]
-                ){
-                sh "docker image tag notes-app-jenkins:latest ${env.dockerHubUser}/notes-app-jenkins:latest"
-                sh "docker login -u ${env.dockerHubUser} -p ${env.dockerHubPass}"
-                sh "docker push ${env.dockerHubUser}/notes-app-jenkins:latest"
-                }
-            }
-        }
-        
-        stage("Deploy"){
-            steps{
-                sh "docker compose up -d"
+}
+         stage('Deploy') {
+            steps {
+                echo 'App deploy'
+                sh "docker-compose down && docker-compose up -d"
             }
         }
     }
